@@ -22,30 +22,35 @@
    ============================================================ */
 
 import { topliste, spielZuruecksetzen } from "./assets/storage.js";
-import { bewegungReduziert, gameOverDialog, toplisteAnzeigen, zahlHochzaehlen } from "./assets/ui.js";
+import {
+  bewegungReduziert,
+  gameOverDialog,
+  toplisteAnzeigen,
+  zahlHochzaehlen,
+} from "./assets/ui.js";
 import { spielSeite, text, TASTE, ansage } from "./assets/mobil.js";
 import { levelWahl } from "./assets/levelwahl.js";
 
 /* ---------- Konstanten (Stellschrauben des Spiels) ----------
    Alles, was man zum Ausbalancieren ändern möchte, steht hier oben
    an einer Stelle statt als "magische Zahl" im Code verstreut. */
-const SPIEL = "snake";                 // Schlüssel für den Speicher (storage.js)
-const ZELLEN = 20;                     // Raster: 20 x 20 Zellen
-const ZELLGROESSE = 20;                // Pixel pro Zelle -> Canvas 400 x 400
+const SPIEL = "snake"; // Schlüssel für den Speicher (storage.js)
+const ZELLEN = 20; // Raster: 20 x 20 Zellen
+const ZELLGROESSE = 20; // Pixel pro Zelle -> Canvas 400 x 400
 const FELDGROESSE = ZELLEN * ZELLGROESSE;
-const START_TEMPO = 7;                 // Ticks pro Sekunde zu Beginn
-const MAX_TEMPO = 15;                  // schneller wird es nie
-const TEMPO_SCHRITT = 0.5;             // so viel kommt pro Stufe dazu
-const HAPPEN_PRO_STUFE = 5;            // alle 5 Happen eine Stufe schneller
+const START_TEMPO = 7; // Ticks pro Sekunde zu Beginn
+const MAX_TEMPO = 15; // schneller wird es nie
+const TEMPO_SCHRITT = 0.5; // so viel kommt pro Stufe dazu
+const HAPPEN_PRO_STUFE = 5; // alle 5 Happen eine Stufe schneller
 const PUNKTE_PRO_HAPPEN = 10;
-const MAX_WARTESCHLANGE = 2;           // max. vorgemerkte Richtungswechsel
-const ZIEL_HAPPEN = 10;                // so viele Happen bis zum nächsten Level
-const PUNKTE_LEVELBONUS = 50;          // mal Levelnummer
-const TEMPO_PRO_LEVEL = 0.4;           // Grundtempo steigt je Level
-const MAX_FRAME_ABSTAND_MS = 250;      // siehe einzelbild()
-const BLITZ_DAUER_MS = 650;            // Länge des Kollisions-Aufblitzens
-const WISCH_SCHWELLE = 24;             // ab so vielen Pixeln zählt es als Wischen
-const ZAEHLER_DAUER_MS = 300;          // Dauer des HUD-Hochzählens
+const MAX_WARTESCHLANGE = 2; // max. vorgemerkte Richtungswechsel
+const ZIEL_HAPPEN = 10; // so viele Happen bis zum nächsten Level
+const PUNKTE_LEVELBONUS = 50; // mal Levelnummer
+const TEMPO_PRO_LEVEL = 0.4; // Grundtempo steigt je Level
+const MAX_FRAME_ABSTAND_MS = 250; // siehe einzelbild()
+const BLITZ_DAUER_MS = 650; // Länge des Kollisions-Aufblitzens
+const WISCH_SCHWELLE = 24; // ab so vielen Pixeln zählt es als Wischen
+const ZAEHLER_DAUER_MS = 300; // Dauer des HUD-Hochzählens
 
 // Richtungen als Vektoren: x/y geben an, wohin sich der Kopf pro Tick bewegt.
 const HOCH = { x: 0, y: -1 };
@@ -55,10 +60,14 @@ const RECHTS = { x: 1, y: 0 };
 
 // Tastatur-Zuordnung. Kleinbuchstaben, damit "W" und "w" gleich behandelt werden.
 const TASTEN_RICHTUNG = {
-  arrowup: HOCH, w: HOCH,
-  arrowdown: RUNTER, s: RUNTER,
-  arrowleft: LINKS, a: LINKS,
-  arrowright: RECHTS, d: RECHTS,
+  arrowup: HOCH,
+  w: HOCH,
+  arrowdown: RUNTER,
+  s: RUNTER,
+  arrowleft: LINKS,
+  a: LINKS,
+  arrowright: RECHTS,
+  d: RECHTS,
 };
 
 /* ---------- Level ----------
@@ -68,182 +77,206 @@ const TASTEN_RICHTUNG = {
    das Futter ist also immer erreichbar. Nach Level 8 wiederholen sich
    die Karten mit höherem Grundtempo. */
 const LEVEL = [
-  { name: "Offenes Feld", karte: [
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-  ] },
-  { name: "Ecken", karte: [
-    "....................",
-    "....................",
-    "..####........####..",
-    "..#..............#..",
-    "..#..............#..",
-    "..#..............#..",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "..#..............#..",
-    "..#..............#..",
-    "..#..............#..",
-    "..####........####..",
-    "....................",
-    "....................",
-  ] },
-  { name: "Kreuz", karte: [
-    "....................",
-    "....................",
-    "....................",
-    ".........##.........",
-    ".........##.........",
-    ".........##.........",
-    ".....##########.....",
-    ".....##########.....",
-    ".........##.........",
-    "....................",
-    "....................",
-    "....................",
-    ".........##.........",
-    ".........##.........",
-    ".........##.........",
-    ".........##.........",
-    ".........##.........",
-    "....................",
-    "....................",
-    "....................",
-  ] },
-  { name: "Säulen", karte: [
-    "....................",
-    "....................",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....#...#...#...#...",
-    "....................",
-    "....................",
-  ] },
-  { name: "Kammern", karte: [
-    ".........#..........",
-    ".........#..........",
-    ".........#..........",
-    "....................",
-    ".........#..........",
-    ".........#..........",
-    "####..########..####",
-    ".........#..........",
-    ".........#..........",
-    "....................",
-    "....................",
-    ".........#..........",
-    ".........#..........",
-    "####..########..####",
-    ".........#..........",
-    ".........#..........",
-    "....................",
-    ".........#..........",
-    ".........#..........",
-    ".........#..........",
-  ] },
-  { name: "Spirale", karte: [
-    "....................",
-    "....................",
-    "...###############..",
-    ".................#..",
-    "....############.#..",
-    "....#..........#.#..",
-    "....#..........#.#..",
-    "....#..######..#.#..",
-    "....#..#....#..#.#..",
-    "....#..#....#..#.#..",
-    "...............#.#..",
-    "....#..#....#..#.#..",
-    "....#..#....#..#.#..",
-    "....#..#.......#.#..",
-    "....#..#.......#.#..",
-    "....#..########..#..",
-    "....#............#..",
-    ".....#############..",
-    "....................",
-    "....................",
-  ] },
-  { name: "Gitter", karte: [
-    "....................",
-    "....................",
-    "..##..##..##..##....",
-    "..##..##..##..##....",
-    "....................",
-    "....................",
-    "..##..##..##..##....",
-    "..##..##..##..##....",
-    "....................",
-    "....................",
-    "....................",
-    "..##..##..##..##....",
-    "....................",
-    "....................",
-    "..##..##..##..##....",
-    "..##..##..##..##....",
-    "....................",
-    "....................",
-    "....................",
-    "....................",
-  ] },
-  { name: "Labyrinth", karte: [
-    "....................",
-    "....................",
-    "..#######..#######..",
-    "..#..............#..",
-    "..#..............#..",
-    "..#..##########..#..",
-    "..#..#........#..#..",
-    "..#..#........#..#..",
-    "..#..#........#..#..",
-    "....................",
-    "....................",
-    "....................",
-    "..#..#........#..#..",
-    "..#..#........#..#..",
-    "..#..##########..#..",
-    "..#..............#..",
-    "..#..............#..",
-    "..#######..#######..",
-    "....................",
-    "....................",
-  ] },
+  {
+    name: "Offenes Feld",
+    karte: [
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+    ],
+  },
+  {
+    name: "Ecken",
+    karte: [
+      "....................",
+      "....................",
+      "..####........####..",
+      "..#..............#..",
+      "..#..............#..",
+      "..#..............#..",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "..#..............#..",
+      "..#..............#..",
+      "..#..............#..",
+      "..####........####..",
+      "....................",
+      "....................",
+    ],
+  },
+  {
+    name: "Kreuz",
+    karte: [
+      "....................",
+      "....................",
+      "....................",
+      ".........##.........",
+      ".........##.........",
+      ".........##.........",
+      ".....##########.....",
+      ".....##########.....",
+      ".........##.........",
+      "....................",
+      "....................",
+      "....................",
+      ".........##.........",
+      ".........##.........",
+      ".........##.........",
+      ".........##.........",
+      ".........##.........",
+      "....................",
+      "....................",
+      "....................",
+    ],
+  },
+  {
+    name: "Säulen",
+    karte: [
+      "....................",
+      "....................",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....#...#...#...#...",
+      "....................",
+      "....................",
+    ],
+  },
+  {
+    name: "Kammern",
+    karte: [
+      ".........#..........",
+      ".........#..........",
+      ".........#..........",
+      "....................",
+      ".........#..........",
+      ".........#..........",
+      "####..########..####",
+      ".........#..........",
+      ".........#..........",
+      "....................",
+      "....................",
+      ".........#..........",
+      ".........#..........",
+      "####..########..####",
+      ".........#..........",
+      ".........#..........",
+      "....................",
+      ".........#..........",
+      ".........#..........",
+      ".........#..........",
+    ],
+  },
+  {
+    name: "Spirale",
+    karte: [
+      "....................",
+      "....................",
+      "...###############..",
+      ".................#..",
+      "....############.#..",
+      "....#..........#.#..",
+      "....#..........#.#..",
+      "....#..######..#.#..",
+      "....#..#....#..#.#..",
+      "....#..#....#..#.#..",
+      "...............#.#..",
+      "....#..#....#..#.#..",
+      "....#..#....#..#.#..",
+      "....#..#.......#.#..",
+      "....#..#.......#.#..",
+      "....#..########..#..",
+      "....#............#..",
+      ".....#############..",
+      "....................",
+      "....................",
+    ],
+  },
+  {
+    name: "Gitter",
+    karte: [
+      "....................",
+      "....................",
+      "..##..##..##..##....",
+      "..##..##..##..##....",
+      "....................",
+      "....................",
+      "..##..##..##..##....",
+      "..##..##..##..##....",
+      "....................",
+      "....................",
+      "....................",
+      "..##..##..##..##....",
+      "....................",
+      "....................",
+      "..##..##..##..##....",
+      "..##..##..##..##....",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+    ],
+  },
+  {
+    name: "Labyrinth",
+    karte: [
+      "....................",
+      "....................",
+      "..#######..#######..",
+      "..#..............#..",
+      "..#..............#..",
+      "..#..##########..#..",
+      "..#..#........#..#..",
+      "..#..#........#..#..",
+      "..#..#........#..#..",
+      "....................",
+      "....................",
+      "....................",
+      "..#..#........#..#..",
+      "..#..#........#..#..",
+      "..#..##########..#..",
+      "..#..............#..",
+      "..#..............#..",
+      "..#######..#######..",
+      "....................",
+      "....................",
+    ],
+  },
 ];
 
 /* ---------- Elemente der Seite ---------- */
@@ -280,12 +313,13 @@ function lesFarbe(name, notfall) {
  */
 function mischeMitWeiss(farbe, anteil) {
   const treffer = /^#([0-9a-f]{6})$/i.exec(farbe);
-  if (!treffer) return farbe;                   // unbekanntes Format: unverändert lassen
+  if (!treffer) return farbe; // unbekanntes Format: unverändert lassen
   const zahl = parseInt(treffer[1], 16);
   // Ein 24-Bit-Wert besteht aus drei Bytes: Rot, Grün, Blau. Mit
   // Bit-Verschiebung (>>) und Maske (& 255) holen wir sie einzeln heraus.
-  const kanaele = [(zahl >> 16) & 255, (zahl >> 8) & 255, zahl & 255]
-    .map((k) => Math.round(k + (255 - k) * anteil));
+  const kanaele = [(zahl >> 16) & 255, (zahl >> 8) & 255, zahl & 255].map((k) =>
+    Math.round(k + (255 - k) * anteil),
+  );
   return `rgb(${kanaele.join(",")})`;
 }
 
@@ -306,31 +340,37 @@ farben.kopf = mischeMitWeiss(farben.schlange, 0.45);
    Rahmen, HUD und Knöpfe außerhalb bleiben im Neon-Design. */
 const LCD = { grund: "#b4c49b", schatten: "#a3b38a", pixel: "#2c3826", mittel: "#5d6b52" };
 Object.assign(farben, {
-  hintergrund: LCD.grund, gitter: LCD.schatten, schlange: LCD.pixel, futter: LCD.pixel,
-  kopf: LCD.pixel, text: LCD.pixel, gedaempft: LCD.mittel, mauer: LCD.pixel,
+  hintergrund: LCD.grund,
+  gitter: LCD.schatten,
+  schlange: LCD.pixel,
+  futter: LCD.pixel,
+  kopf: LCD.pixel,
+  text: LCD.pixel,
+  gedaempft: LCD.mittel,
+  mauer: LCD.pixel,
 });
 /* ---------- Spielzustand ----------
    Wird in neuesSpiel() zurückgesetzt. `let`, weil sich die Werte ändern. */
-let schlange;            // [{x,y}, …] Kopf zuerst
-let vorherigeSchlange;   // Zustand VOR dem letzten Tick (für weiche Animation)
-let richtung;            // Richtung, in die der letzte Tick gelaufen ist
-let warteschlange;       // vorgemerkte Richtungswechsel (siehe richtungSetzen)
-let futter;              // {x,y} der Futterzelle
-let futterSeit;          // Zeitstempel, wann das Futter erschien (Einblend-Effekt)
+let schlange; // [{x,y}, …] Kopf zuerst
+let vorherigeSchlange; // Zustand VOR dem letzten Tick (für weiche Animation)
+let richtung; // Richtung, in die der letzte Tick gelaufen ist
+let warteschlange; // vorgemerkte Richtungswechsel (siehe richtungSetzen)
+let futter; // {x,y} der Futterzelle
+let futterSeit; // Zeitstempel, wann das Futter erschien (Einblend-Effekt)
 let punkte;
-let happen;              // Anzahl gefressener Happen im aktuellen Level, steuert das Tempo
-let level = 1;           // aktuelles Level (ab 9: Karten wiederholen sich)
-let startLevel = 1;      // in der Level-Auswahl gewähltes Start-Level
-let mauern = new Set();  // Mauerzellen als Zahl y * ZELLEN + x
-let rekordGespeichert = 0;   // bester Topliste-Eintrag aus dem Speicher
-let phase;               // "bereit" | "laeuft" | "pause" | "vorbei"
-let gewonnen;            // true, wenn das Feld komplett voll ist
-let akkumulator = 0;     // angesammelte, noch nicht "verbrauchte" Zeit in ms
-let letzteZeit = 0;      // Zeitstempel des vorigen Frames
+let happen; // Anzahl gefressener Happen im aktuellen Level, steuert das Tempo
+let level = 1; // aktuelles Level (ab 9: Karten wiederholen sich)
+let startLevel = 1; // in der Level-Auswahl gewähltes Start-Level
+let mauern = new Set(); // Mauerzellen als Zahl y * ZELLEN + x
+let rekordGespeichert = 0; // bester Topliste-Eintrag aus dem Speicher
+let phase; // "bereit" | "laeuft" | "pause" | "vorbei"
+let gewonnen; // true, wenn das Feld komplett voll ist
+let akkumulator = 0; // angesammelte, noch nicht "verbrauchte" Zeit in ms
+let letzteZeit = 0; // Zeitstempel des vorigen Frames
 let blitzStart = 0;
 let dialogGezeigt = false;
-let partikel = [];       // kleine Funken beim Fressen (nur Deko)
-let ruhigerModus = bewegungReduziert();   // wird jeden Frame aktualisiert
+let partikel = []; // kleine Funken beim Fressen (nur Deko)
+let ruhigerModus = bewegungReduziert(); // wird jeden Frame aktualisiert
 
 /* ============================================================
    HUD: weich hochzählende Anzeigen
@@ -348,9 +388,9 @@ let ruhigerModus = bewegungReduziert();   // wird jeden Frame aktualisiert
  * Funktionen merken sich startZeit, wartet und ziel über Aufrufe hinweg.
  */
 function erzeugeZaehler(element) {
-  let startZeit = -Infinity;   // wann die letzte Animation begann
-  let wartet = null;           // Timer-ID, falls ein Update vorgemerkt ist
-  let ziel = 0;                // zuletzt gewünschter Wert
+  let startZeit = -Infinity; // wann die letzte Animation begann
+  let wartet = null; // Timer-ID, falls ein Update vorgemerkt ist
+  let ziel = 0; // zuletzt gewünschter Wert
 
   function setze(neuerWert) {
     ziel = neuerWert;
@@ -361,10 +401,13 @@ function erzeugeZaehler(element) {
     } else if (wartet === null) {
       // Noch beschäftigt: später nochmal versuchen, dann mit dem dann
       // aktuellen Ziel. Die +20 ms sind ein kleiner Sicherheitspuffer.
-      wartet = setTimeout(() => {
-        wartet = null;
-        setze(ziel);
-      }, ZAEHLER_DAUER_MS - vergangen + 20);
+      wartet = setTimeout(
+        () => {
+          wartet = null;
+          setze(ziel);
+        },
+        ZAEHLER_DAUER_MS - vergangen + 20,
+      );
     }
   }
 
@@ -415,9 +458,11 @@ function rekordLive() {
 /** Kurzer Puls am Rekordfeld, genau in dem Moment, in dem er geknackt wird. */
 function rekordPulsen() {
   hudRekord.classList.remove("rekord-puls");
-  void hudRekord.offsetWidth;   // erzwingt Neuberechnung des Layouts, damit die Animation neu startet
+  void hudRekord.offsetWidth; // erzwingt Neuberechnung des Layouts, damit die Animation neu startet
   hudRekord.classList.add("rekord-puls");
-  hudRekord.addEventListener("animationend", () => hudRekord.classList.remove("rekord-puls"), { once: true });
+  hudRekord.addEventListener("animationend", () => hudRekord.classList.remove("rekord-puls"), {
+    once: true,
+  });
 }
 
 /* ============================================================
@@ -432,10 +477,16 @@ function rekordPulsen() {
 function levelStarten() {
   mauern = new Set();
   karteFuer(level).karte.forEach((zeile, y) => {
-    [...zeile].forEach((zeichen, x) => { if (zeichen === "#") mauern.add(y * ZELLEN + x); });
+    [...zeile].forEach((zeichen, x) => {
+      if (zeichen === "#") mauern.add(y * ZELLEN + x);
+    });
   });
   // Startschlange: 3 Segmente, Kopf vorn, Blick nach rechts.
-  schlange = [{ x: 6, y: 10 }, { x: 5, y: 10 }, { x: 4, y: 10 }];
+  schlange = [
+    { x: 6, y: 10 },
+    { x: 5, y: 10 },
+    { x: 4, y: 10 },
+  ];
   vorherigeSchlange = schlange.map((zelle) => ({ ...zelle }));
   richtung = RECHTS;
   warteschlange = [];
@@ -504,7 +555,7 @@ function richtungSetzen(neueRichtung) {
   const bezug = warteschlange.length > 0 ? warteschlange[warteschlange.length - 1] : richtung;
   const istGegenteil = neueRichtung.x === -bezug.x && neueRichtung.y === -bezug.y;
   const istGleich = neueRichtung.x === bezug.x && neueRichtung.y === bezug.y;
-  if (istGegenteil || istGleich) return;                 // sinnlos oder verboten
+  if (istGegenteil || istGleich) return; // sinnlos oder verboten
   if (warteschlange.length >= MAX_WARTESCHLANGE) return; // Eingabeflut abfangen
   warteschlange.push(neueRichtung);
 }
@@ -526,7 +577,8 @@ function tick() {
   const neuerKopf = { x: kopf.x + richtung.x, y: kopf.y + richtung.y };
 
   // 1) Wand getroffen?
-  const ausserhalb = neuerKopf.x < 0 || neuerKopf.x >= ZELLEN || neuerKopf.y < 0 || neuerKopf.y >= ZELLEN;
+  const ausserhalb =
+    neuerKopf.x < 0 || neuerKopf.x >= ZELLEN || neuerKopf.y < 0 || neuerKopf.y >= ZELLEN;
   if (ausserhalb || mauern.has(neuerKopf.y * ZELLEN + neuerKopf.x)) {
     spielBeenden(false);
     return;
@@ -558,7 +610,10 @@ function tick() {
 
     // Rekord live nachziehen; Puls nur im Moment des Überholens.
     // (Bei Rekord 0 gibt es nichts zu überbieten, dann kein Puls.)
-    const gerade = rekordGespeichert > 0 && punkte > rekordGespeichert && punkte - PUNKTE_PRO_HAPPEN <= rekordGespeichert;
+    const gerade =
+      rekordGespeichert > 0 &&
+      punkte > rekordGespeichert &&
+      punkte - PUNKTE_PRO_HAPPEN <= rekordGespeichert;
     rekordZaehler.setze(rekordLive());
     if (gerade && !ruhigerModus) rekordPulsen();
 
@@ -572,7 +627,7 @@ function tick() {
       ansage(`Level ${level}: ${karteFuer(level).name}`);
       return;
     }
-    if (!futterPlatzieren()) spielBeenden(true);   // kein Platz mehr = gewonnen
+    if (!futterPlatzieren()) spielBeenden(true); // kein Platz mehr = gewonnen
   } else {
     // … sonst das Schwanzende abschneiden → Länge bleibt gleich.
     schlange.pop();
@@ -598,7 +653,7 @@ function dialogAnzeigen() {
     titel: gewonnen ? "GEWONNEN!" : "GAME OVER",
     punkte,
     punkteText: `${punkte} Punkte`,
-    richtung: "hoch",          // bei Snake ist MEHR besser
+    richtung: "hoch", // bei Snake ist MEHR besser
     format: (p) => `${p} Punkte`,
     neustart: () => neuesSpiel(startLevel),
   });
@@ -629,13 +684,14 @@ function pauseUmschalten() {
 function bestaetigen() {
   if (phase === "bereit") spielStarten();
   else if (phase === "pause") phase = "laeuft";
-  else if (phase === "vorbei" && dialogGezeigt && !document.getElementById("spiel-dialog")) neuesSpiel(startLevel);
+  else if (phase === "vorbei" && dialogGezeigt && !document.getElementById("spiel-dialog"))
+    neuesSpiel(startLevel);
 }
 
 /** Gemeinsame Richtungs-Eingabe für Tastatur und Wischen. */
 function richtungsEingabe(neueRichtung) {
   if (phase === "bereit") {
-    richtungSetzen(neueRichtung);   // die erste Taste lenkt UND startet
+    richtungSetzen(neueRichtung); // die erste Taste lenkt UND startet
     spielStarten();
   } else if (phase === "pause") {
     richtungSetzen(neueRichtung);
@@ -643,7 +699,7 @@ function richtungsEingabe(neueRichtung) {
   } else if (phase === "laeuft") {
     richtungSetzen(neueRichtung);
   } else {
-    bestaetigen();                  // "vorbei": evtl. Neustart nach Esc
+    bestaetigen(); // "vorbei": evtl. Neustart nach Esc
   }
 }
 
@@ -684,8 +740,8 @@ document.addEventListener("keydown", (ereignis) => {
 /* ============================================================
    Eingabe: Wischen und Tippen (Pointer Events)
    ============================================================ */
-let wischStart = null;       // Punkt, ab dem die aktuelle Geste gemessen wird
-let hatGewischt = false;     // war die Geste ein Wischen (sonst: ein Tippen)?
+let wischStart = null; // Punkt, ab dem die aktuelle Geste gemessen wird
+let hatGewischt = false; // war die Geste ein Wischen (sonst: ein Tippen)?
 
 leinwand.addEventListener("pointerdown", (ereignis) => {
   wischStart = { x: ereignis.clientX, y: ereignis.clientY };
@@ -699,12 +755,11 @@ leinwand.addEventListener("pointermove", (ereignis) => {
   if (!wischStart) return;
   const dx = ereignis.clientX - wischStart.x;
   const dy = ereignis.clientY - wischStart.y;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < WISCH_SCHWELLE) return;   // noch zu kurz
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < WISCH_SCHWELLE) return; // noch zu kurz
 
   // Die Achse mit der größeren Bewegung gewinnt (diagonal wird so eindeutig).
-  const neueRichtung = Math.abs(dx) > Math.abs(dy)
-    ? (dx > 0 ? RECHTS : LINKS)
-    : (dy > 0 ? RUNTER : HOCH);
+  const neueRichtung =
+    Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? RECHTS : LINKS) : dy > 0 ? RUNTER : HOCH;
   hatGewischt = true;
   // Messpunkt zurücksetzen: Wer ohne Absetzen im Zickzack wischt, kann
   // mehrfach hintereinander abbiegen.
@@ -721,7 +776,9 @@ leinwand.addEventListener("pointerup", () => {
   }
   wischStart = null;
 });
-leinwand.addEventListener("pointercancel", () => { wischStart = null; });
+leinwand.addEventListener("pointercancel", () => {
+  wischStart = null;
+});
 
 // Wechselt jemand den Tab, läuft das Spiel nicht weiter, sonst stirbt die
 // Schlange im Hintergrund. (Der Browser bremst dort requestAnimationFrame ohnehin.)
@@ -733,8 +790,8 @@ document.addEventListener("visibilitychange", () => {
 resetKnopf.addEventListener("click", () => {
   spielZuruecksetzen(SPIEL);
   wahl.neuLaden();
-  toplisteAktualisieren();                 // Liste leer, Rekord wieder 0
-  rekordZaehler.sofort(rekordLive());      // läuft gerade ein Spiel, gilt dessen Punktzahl
+  toplisteAktualisieren(); // Liste leer, Rekord wieder 0
+  rekordZaehler.sofort(rekordLive()); // läuft gerade ein Spiel, gilt dessen Punktzahl
   if (phase === "laeuft") phase = "pause"; // nicht im Hintergrund weiterspielen
   // Den Knopf wieder abgeben: Sonst würde die nächste Leertaste/Enter
   // erneut ihn "drücken", statt das Spiel zu starten.
@@ -768,7 +825,7 @@ function einzelbild(jetzt) {
   // Debugger) zurück, wären sonst Dutzende Ticks auf einmal "fällig".
   const abstand = Math.min(jetzt - letzteZeit, MAX_FRAME_ABSTAND_MS);
   letzteZeit = jetzt;
-  ruhigerModus = bewegungReduziert();   // Nutzer kann die Einstellung jederzeit ändern
+  ruhigerModus = bewegungReduziert(); // Nutzer kann die Einstellung jederzeit ändern
 
   if (phase === "laeuft") {
     akkumulator += abstand;
@@ -818,8 +875,12 @@ function zeichneAlles(jetzt, fortschritt) {
 
   // Overlays je nach Phase
   if (phase === "bereit") {
-    zeichneOverlay(`LEVEL ${level}`, karteFuer(level).name, jetzt,
-      text("Pfeiltaste, Leertaste oder Tippen", "Tippen oder Richtung wählen"));
+    zeichneOverlay(
+      `LEVEL ${level}`,
+      karteFuer(level).name,
+      jetzt,
+      text("Pfeiltaste, Leertaste oder Tippen", "Tippen oder Richtung wählen"),
+    );
   } else if (phase === "pause") {
     zeichneOverlay("PAUSE", text("P oder Leertaste: weiter", "Antippen: weiter"), jetzt);
   } else if (phase === "vorbei" && !ruhigerModus) {
@@ -854,8 +915,10 @@ function zeichneGitter() {
   for (let i = 1; i < ZELLEN; i++) {
     // +0.5, damit die 1-Pixel-Linie genau auf einem Pixel liegt und scharf bleibt
     const p = i * ZELLGROESSE + 0.5;
-    z.moveTo(p, 0); z.lineTo(p, FELDGROESSE);
-    z.moveTo(0, p); z.lineTo(FELDGROESSE, p);
+    z.moveTo(p, 0);
+    z.lineTo(p, FELDGROESSE);
+    z.moveTo(0, p);
+    z.lineTo(FELDGROESSE, p);
   }
   z.stroke();
   z.restore();
@@ -899,7 +962,7 @@ function zeichneFutter(jetzt) {
  */
 function zeichneSchlange(fortschritt) {
   const z = zeichner;
-  const rand = 1.5;                               // kleiner Abstand zwischen den Segmenten
+  const rand = 1.5; // kleiner Abstand zwischen den Segmenten
   const kante = ZELLGROESSE - rand * 2;
   const anzahl = schlange.length;
 
@@ -938,7 +1001,8 @@ function zeichneAugen(mitteX, mitteY) {
     z.fillRect(
       mitteX + richtung.x * 3 + quer.x * 4 * seite - 2,
       mitteY + richtung.y * 3 + quer.y * 4 * seite - 2,
-      4, 4,
+      4,
+      4,
     );
   }
   z.restore();
@@ -947,17 +1011,18 @@ function zeichneAugen(mitteX, mitteY) {
 /* ---------- Partikel (kleine Funken beim Fressen) ---------- */
 
 function partikelErzeugen(zelle) {
-  if (ruhigerModus) return;                       // reine Deko → bei reduzierter Bewegung weglassen
+  if (ruhigerModus) return; // reine Deko → bei reduzierter Bewegung weglassen
   const mitteX = (zelle.x + 0.5) * ZELLGROESSE;
   const mitteY = (zelle.y + 0.5) * ZELLGROESSE;
   for (let i = 0; i < 10; i++) {
-    const winkel = Math.random() * Math.PI * 2;   // zufällige Flugrichtung
-    const tempo = 40 + Math.random() * 90;        // Pixel pro Sekunde
+    const winkel = Math.random() * Math.PI * 2; // zufällige Flugrichtung
+    const tempo = 40 + Math.random() * 90; // Pixel pro Sekunde
     partikel.push({
-      x: mitteX, y: mitteY,
+      x: mitteX,
+      y: mitteY,
       vx: Math.cos(winkel) * tempo,
       vy: Math.sin(winkel) * tempo,
-      leben: 1,                                   // 1 = frisch, 0 = verschwunden
+      leben: 1, // 1 = frisch, 0 = verschwunden
     });
   }
 }
@@ -967,7 +1032,7 @@ function partikelBewegen(sekunden) {
   for (const p of partikel) {
     p.x += p.vx * sekunden;
     p.y += p.vy * sekunden;
-    p.leben -= sekunden * 2.2;                    // in ca. 0,45 s ausgeblendet
+    p.leben -= sekunden * 2.2; // in ca. 0,45 s ausgeblendet
   }
   partikel = partikel.filter((p) => p.leben > 0); // Abgelaufene aussortieren
 }
