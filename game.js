@@ -1110,4 +1110,18 @@ letzteZeit = performance.now();
 requestAnimationFrame(einzelbild);
 
 // Handy: Steuerkreuz, Einpassen, Scroll-Sperre, Spielmodus (assets/mobil.js)
-spielSeite({ phase: () => phase, gamepad: { links: "kreuz" } });
+spielSeite({
+  phase: () => phase,
+  gamepad: {
+    links: "kreuz",
+    rechts: [
+      { key: "p", zeichen: "B", name: "Pause", beschriftung: "PAUSE" },
+      { key: " ", zeichen: "A", name: "Start", beschriftung: "START" },
+    ],
+  },
+});
+// Strom-LED leuchtet, solange eine Runde läuft
+setInterval(
+  () => document.getElementById("handheld")?.classList.toggle("an", phase === "laeuft"),
+  300,
+);

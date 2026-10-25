@@ -3,9 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#07070f" />
+    <meta name="theme-color" content="#07070f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f3f9" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./assets/style.css" />
+    <script src="./assets/thema.js?v=20261024"></script>
+    <link rel="stylesheet" href="./assets/style.css?v=20261024w" />
+    <link rel="stylesheet" href="./handheld.css?v=20261024" />
     <title>Snake · Browser-Arcade</title>
     <meta
       name="description"
@@ -48,17 +51,24 @@
           <div class="wert" id="hud-ziel">0/10</div>
         </div>
       </div>
-      <div class="buehne">
-        <!-- Logisch 400x400 Pixel (20x20 Zellen à 20 px). Die CSS-Breite (100%, max. 560px)
+      <div class="handheld" id="handheld">
+        <div class="hh-oben" aria-hidden="true">
+          <span class="hh-led"></span>STROM<span class="hh-titel">PIXEL-SCHLANGE</span>
+        </div>
+        <div class="buehne">
+          <!-- Logisch 400x400 Pixel (20x20 Zellen à 20 px). Die CSS-Breite (100%, max. 560px)
            skaliert das Bild nur; die Spiellogik rechnet immer in den 400er-Koordinaten. -->
-        <canvas
-          id="leinwand"
-          width="400"
-          height="400"
-          role="img"
-          aria-label="Snake-Spielfeld mit 20 mal 20 Feldern im Look eines alten Handy-Displays: dunkle Pixel auf hellgrünem Grund, je nach Level mit Mauern"
-          style="max-width: 560px; margin-inline: auto; image-rendering: pixelated"
-        ></canvas>
+          <canvas
+            id="leinwand"
+            width="400"
+            height="400"
+            role="img"
+            aria-label="Snake-Spielfeld mit 20 mal 20 Feldern im Look eines alten Handy-Displays: dunkle Pixel auf hellgrünem Grund, je nach Level mit Mauern"
+            style="max-width: 560px; margin-inline: auto; image-rendering: pixelated"
+          ></canvas>
+        </div>
+        <p class="hh-marke" aria-hidden="true">ARCADE<small>TASCHENKONSOLE</small></p>
+        <span class="hh-lautsprecher" aria-hidden="true"></span>
       </div>
       <p class="steuerung">
         <span class="nur-tastatur"
@@ -72,9 +82,7 @@
         >
       </p>
       <section style="max-width: 420px; margin-top: 36px">
-        <h2 style="font-family: var(--pixel); font-weight: 400; font-size: 0.85rem">
-          Lokale Top 3
-        </h2>
+        <h2 style="font-family: var(--pixel); font-weight: 400; font-size: 0.85rem">Topliste</h2>
         <div id="topliste"></div>
         <button class="knopf" id="reset" style="margin-top: 10px">Spielstand zurücksetzen</button>
       </section>
@@ -167,6 +175,6 @@
         </nav>
       </div>
     </footer>
-    <script type="module" src="./game.js"></script>
+    <script type="module" src="./game.js?v=20261024"></script>
   </body>
 </html>
